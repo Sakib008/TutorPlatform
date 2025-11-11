@@ -1,15 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
 import StudentDashboard from './pages/StudentDashboard';
+import { useAppSelector } from './store/hook';
+
+function useAuth() {
+  const { user } = useAppSelector((state) => state.auth);
+  return {
+    isAuthenticated: !!user,
+    isAdmin: user?.role === 'ADMIN',
+  };
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
-
 function DashboardRoute() {
   const { isAdmin } = useAuth();
   return isAdmin ? <AdminDashboard /> : <StudentDashboard />;
@@ -18,7 +25,6 @@ function DashboardRoute() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -32,7 +38,6 @@ function App() {
           />
           <Route path="/" element={<Navigate to="/dashboard" />} />
         </Routes>
-      </AuthProvider>
     </BrowserRouter>
   );
 }

@@ -1,112 +1,112 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import api from '../lib/api';
-
-interface Session {
-  id: string;
-  title: string;
-  description: string;
-  videos: Video[];
-}
-
-interface Video {
-  id: string;
-  title: string;
-  description: string;
-  url: string;
-  duration?: number;
-}
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  fetchSessions,
+  createSession,
+  deleteSession,
+  createVideo,
+  deleteVideo,
+} from "../store/session/sessionSlice";
+import { useAppDispatch, useAppSelector } from "../store/hook";
+import type { Session } from "../store/types";
+import { logout } from "../store/session/authSlice";
+import { toast } from "sonner";
 
 export default function AdminDashboard() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user } = useAppSelector((state) => state.auth);
   const navigate = useNavigate();
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  type VideoFormType = {
+    title: string;
+    description: string;
+    file: File | null;
+    sessionId: string;
+    duration: number;
+  };
 
-  const [sessionForm, setSessionForm] = useState({ title: '', description: '' });
-  const [videoForm, setVideoForm] = useState({
-    title: '',
-    description: '',
-    url: '',
-    duration: '',
+  const [sessionForm, setSessionForm] = useState({
+    title: "",
+    description: "",
   });
+  const [videoForm, setVideoForm] = useState<VideoFormType>({
+    title: "",
+    description: "",
+    file: null,
+    sessionId: selectedSession ? selectedSession.id : "",
+    duration: Number(""),
+  });
+  const dispatch = useAppDispatch();
+  const { sessions, error, status } = useAppSelector((state) => state.sessions);
+  console.log("Sessions in Admin Dashboard : ", sessions);
+  const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
     if (!isAdmin) {
-      navigate('/dashboard');
+      navigate("/dashboard");
       return;
     }
-    fetchSessions();
-  }, [isAdmin, navigate]);
-
-  const fetchSessions = async () => {
-    try {
-      const response = await api.get('/sessions');
-      setSessions(response.data.data);
-    } catch (error) {
-      console.error('Failed to fetch sessions', error);
-    }
-  };
+    dispatch(fetchSessions());
+  }, []);
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/sessions', sessionForm);
-      setShowSessionModal(false);
-      setSessionForm({ title: '', description: '' });
-      fetchSessions();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to create session');
+      await dispatch(createSession(sessionForm));
+      dispatch(fetchSessions());
+      console.log("Session created");
+      setSessionForm({ title: "", description: "" });
+    } catch (err: any) {
+      console.error("Failed to create session", err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteSession = async (id: string) => {
-    if (!confirm('Delete this session and all its videos?')) return;
-    try {
-      await api.delete(`/sessions/${id}`);
-      fetchSessions();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete session');
     }
   };
 
   const handleCreateVideo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSession) return;
     setLoading(true);
     try {
-      await api.post('/videos', {
-        ...videoForm,
-        duration: videoForm.duration ? parseInt(videoForm.duration) : undefined,
-        sessionId: selectedSession.id,
+      if(!videoForm.file){
+          toast.error("Please select a video file.");
+          setLoading(false);
+          return;
+      }
+      await dispatch(
+        createVideo({
+          ...videoForm,
+          sessionId: selectedSession?.id || "",
+        })
+      );
+      dispatch(fetchSessions());
+      setVideoForm({
+        title: "",
+        description: "",
+        sessionId: "",
+        file: null,
+        duration: Number(""),
       });
-      setShowVideoModal(false);
-      setVideoForm({ title: '', description: '', url: '', duration: '' });
-      fetchSessions();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to add video');
+    } catch (err: any) {
+      console.error("Failed to create video", err);
     } finally {
       setLoading(false);
     }
   };
-
-  const handleDeleteVideo = async (id: string) => {
-    if (!confirm('Delete this video?')) return;
-    try {
-      await api.delete(`/videos/${id}`);
-      fetchSessions();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete video');
-    }
-  };
-
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center min-w-screen bg-gray-100">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">
+            Error
+          </h1>
+          <p className="text-center text-gray-600 mt-4">{error}</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-sm">
@@ -115,7 +115,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-4">
             <span className="text-gray-600">{user?.name}</span>
             <button
-              onClick={logout}
+              onClick={() => dispatch(logout())}
               className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
             >
               Logout
@@ -136,62 +136,80 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid gap-6">
-          {sessions.map((session) => (
-            <div key={session.id} className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-2xl font-semibold text-gray-800">{session.title}</h3>
-                  <p className="text-gray-600 mt-1">{session.description}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedSession(session);
-                      setShowVideoModal(true);
-                    }}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-                  >
-                    + Add Video
-                  </button>
-                  <button
-                    onClick={() => handleDeleteSession(session.id)}
-                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="font-medium text-gray-700">
-                  Videos ({session.videos.length})
-                </h4>
-                {session.videos.length === 0 ? (
-                  <p className="text-gray-500 italic">No videos yet</p>
-                ) : (
-                  session.videos.map((video) => (
-                    <div
-                      key={video.id}
-                      className="flex justify-between items-center bg-gray-50 p-3 rounded"
+          {status === "loading" || loading ? (
+            <p className="text-center text-gray-500">Loading...</p>
+          ) : null}
+          {sessions &&
+            sessions.map((session) => (
+              <div
+                key={session.id}
+                className="bg-white rounded-lg shadow-md p-6"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-2xl font-semibold text-gray-800">
+                      {session.title}
+                    </h3>
+                    <p className="text-gray-600 mt-1">{session.description}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedSession(session);
+                        setShowVideoModal(true);
+                      }}
+                      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
                     >
-                      <div>
-                        <p className="font-medium text-gray-800">{video.title}</p>
-                        <p className="text-sm text-gray-600">{video.description}</p>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteVideo(video.id)}
-                        className="text-red-600 hover:text-red-800 transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ))}
+                      + Add Video
+                    </button>
+                    <button
+                      onClick={() => dispatch(deleteSession(session.id))}
+                      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
 
-          {sessions.length === 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-gray-700">
+                    Videos ({session.videos.length})
+                  </h4>
+                  {session.videos.length === 0 ? (
+                    <p className="text-gray-500 italic">No videos yet</p>
+                  ) : (
+                    session.videos.map((video) => (
+                      <div
+                        key={video.id}
+                        className="flex justify-between items-center bg-gray-50 p-3 rounded"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            {video.title}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {video.description}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => dispatch(deleteVideo(video.id))}
+                          className="text-red-600 hover:text-red-800 transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+
+          {status === "failed" && (
+            <p className="text-center text-gray-500 py-12">
+              {error || "Failed to load sessions."}
+            </p>
+          )}
+          {status === "succeeded" && sessions.length === 0 && (
             <p className="text-center text-gray-500 py-12">
               No sessions yet. Create your first session!
             </p>
@@ -226,7 +244,10 @@ export default function AdminDashboard() {
                 <textarea
                   value={sessionForm.description}
                   onChange={(e) =>
-                    setSessionForm({ ...sessionForm, description: e.target.value })
+                    setSessionForm({
+                      ...sessionForm,
+                      description: e.target.value,
+                    })
                   }
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   rows={3}
@@ -238,7 +259,7 @@ export default function AdminDashboard() {
                   disabled={loading}
                   className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                 >
-                  {loading ? 'Creating...' : 'Create'}
+                  {loading ? "Creating..." : "Create"}
                 </button>
                 <button
                   type="button"
@@ -275,15 +296,20 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Video URL
+                  Add Video File
                 </label>
                 <input
-                  type="url"
-                  value={videoForm.url}
-                  onChange={(e) => setVideoForm({ ...videoForm, url: e.target.value })}
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) =>
+                    setVideoForm({
+                      ...videoForm,
+                      file:
+                        e.target.files?.[0] != null ? e.target.files[0] : null,
+                    })
+                  }
                   required
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://example.com/video.mp4"
                 />
               </div>
               <div>
@@ -299,26 +325,14 @@ export default function AdminDashboard() {
                   rows={2}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Duration (seconds, optional)
-                </label>
-                <input
-                  type="number"
-                  value={videoForm.duration}
-                  onChange={(e) =>
-                    setVideoForm({ ...videoForm, duration: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+             
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={loading}
                   className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
                 >
-                  {loading ? 'Adding...' : 'Add Video'}
+                  {loading ? "Adding..." : "Add Video"}
                 </button>
                 <button
                   type="button"
@@ -335,4 +349,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-

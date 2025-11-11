@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAppDispatch } from '../store/hook';
+import { registerUser } from '../store/session/authSlice';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -9,7 +10,7 @@ export default function Register() {
   const [role, setRole] = useState<'ADMIN' | 'STUDENT'>('STUDENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,7 +19,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await register(email, password, name, role);
+      await dispatch(registerUser({ email, password, name, role }));
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');

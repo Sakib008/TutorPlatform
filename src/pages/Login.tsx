@@ -1,29 +1,30 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAppDispatch } from '../store/hook';
+import { loginUser } from '../store/session/authSlice';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const dispatch = useAppDispatch();
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
 
-    try {
-      await login(email, password);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    await dispatch(loginUser({ email, password })).unwrap(); // <-- important
+    navigate('/dashboard');
+  } catch (err: any) {
+    setError(err?.message || 'Login failed. Check email or password.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 p-4">
@@ -66,7 +67,6 @@ export default function Login() {
               placeholder="••••••••"
             />
           </div>
-
           <button
             type="submit"
             disabled={loading}

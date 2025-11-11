@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import VideoPlayer from '../components/VideoPlayer';
+import { useAppDispatch, useAppSelector } from '../store/hook';
+import { logout } from '../store/session/authSlice';
 
 interface Session {
   id: string;
@@ -19,7 +20,8 @@ interface Video {
 }
 
 export default function StudentDashboard() {
-  const { user, logout } = useAuth();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
@@ -45,7 +47,7 @@ export default function StudentDashboard() {
           <div className="flex items-center gap-4">
             <span className="text-gray-600">{user?.name}</span>
             <button
-              onClick={logout}
+              onClick={() => dispatch(logout())}
               className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
             >
               Logout
