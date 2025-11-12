@@ -17,7 +17,7 @@ export default function Login() {
   setLoading(true);
 
   try {
-    await dispatch(loginUser({ email, password })).unwrap(); // <-- important
+    await dispatch(loginUser({ email, password })).unwrap(); 
     navigate('/dashboard');
   } catch (err: any) {
     setError(err?.message || 'Login failed. Check email or password.');
