@@ -6,16 +6,24 @@ import {
 } from "@reduxjs/toolkit";
 import api from "../../lib/api";
 import type { CreateVideoInput, Session } from "../types";
+import { toast } from "sonner";
 
 // State type
 interface SessionsState {
   sessions: Session[];
+  session: Session | null;
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
 }
 
+function getErrorMessage(action: any, fallback: string) {
+  if (typeof action.payload === "string") return action.payload;
+  return action.error?.message ?? fallback;
+}
+
 const initialState: SessionsState = {
   sessions: [],
+  session: null,
   status: "idle",
   error: null,
 };
@@ -27,7 +35,7 @@ export const fetchSessions = createAsyncThunk<
   { rejectValue: string }
 >("sessions/fetchAll", async (_, { rejectWithValue }) => {
   try {
-    const res = await api.get("/sessions",{
+    const res = await api.get("/sessions", {
       headers: {
         authorization: `Bearer ${token}`,
       },
@@ -40,14 +48,38 @@ export const fetchSessions = createAsyncThunk<
   }
 });
 
+// fetch session by id
+export const fetchSessionById = createAsyncThunk<
+  Session,
+  void,
+  { rejectValue: string }
+>("sessions/fetchById", async (id, { rejectWithValue }) => {
+  try {
+    const res = await api.get(`/sessions/${id}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    return res.data.data;
+  } catch (error: any) {
+    return rejectWithValue(
+      error.response?.data?.message ??
+        error.message ??
+        "Failed to fetch session"
+    );
+  }
+});
+
 // create session
 export const createSession = createAsyncThunk<
   Session,
-  { title: string; description: string },
+  { title: string; description: string | null },
   { rejectValue: string }
 >("sessions/create", async (payload, { rejectWithValue }) => {
   try {
-    const res = await api.post("/sessions", payload);
+    const res = await api.post("/sessions", payload, {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
     return res.data?.data ?? res.data;
   } catch (err: any) {
     return rejectWithValue(
@@ -63,7 +95,11 @@ export const deleteSession = createAsyncThunk<
   { rejectValue: string }
 >("sessions/delete", async (id, { rejectWithValue }) => {
   try {
-    await api.delete(`/sessions/${id}`);
+    await api.delete(`/sessions/${id}`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
     return id;
   } catch (err: any) {
     return rejectWithValue(
@@ -72,8 +108,7 @@ export const deleteSession = createAsyncThunk<
   }
 });
 
-// create video: tries to return the updated Session. If POST returns only the created video,
-// we fetch the session by sessionId to obtain the updated session.
+// create video
 export const createVideo = createAsyncThunk(
   "videos/createVideo",
   async (videoData: CreateVideoInput, { rejectWithValue }) => {
@@ -82,29 +117,43 @@ export const createVideo = createAsyncThunk(
       formData.append("title", videoData.title);
       formData.append("description", videoData.description || "");
       formData.append("sessionId", videoData.sessionId);
-      if (videoData.duration) formData.append("duration", videoData.duration.toString());
-      if (videoData.file) formData.append("file", videoData.file);
-
+      if (videoData.duration)
+        formData.append("duration", videoData.duration.toString());
+      if (!videoData.file) {
+        return rejectWithValue("File is required");
+      }
+      formData.append("video", videoData.file);
       const res = await api.post("/videos", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+          authorization: `Bearer ${token}`,
+        },
       });
-
       return res.data.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || "Failed to upload video");
+      toast.error(
+        "Failed to upload video: " +
+          (error instanceof Error ? error.message : String(error))
+      );
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to upload video"
+      );
     }
   }
 );
 
-
-// delete video: return { id, sessionId? } where sessionId is optional
+// delete video
 export const deleteVideo = createAsyncThunk<
   { sessionId?: string; id: string },
   string,
   { rejectValue: string }
 >("videos/delete", async (id, { rejectWithValue }) => {
   try {
-    const res = await api.delete(`/videos/${id}`);
+    const res = await api.delete(`/videos/${id}`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
     const data = res.data?.data ?? res.data;
 
     if (data && typeof data === "object" && "sessionId" in data) {
@@ -149,6 +198,22 @@ const sessionsSlice = createSlice({
         state.status = "failed";
         state.error =
           action.payload ?? action.error.message ?? "Failed to fetch sessions";
+      });
+
+    // fetchSessionById
+    builder
+      .addCase(fetchSessionById.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(fetchSessionById.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        state.session = action.payload;
+      })
+      .addCase(fetchSessionById.rejected, (state, action) => {
+        state.status = "failed";
+        state.error =
+          action.payload ?? action.error.message ?? "Failed to fetch session";
       });
 
     // createSession
@@ -209,8 +274,7 @@ const sessionsSlice = createSlice({
       )
       .addCase(createVideo.rejected, (state, action) => {
         state.status = "failed";
-        state.error =
-          action.payload ?? action.error.message ?? "Failed to add video" ;
+        state.error = getErrorMessage(action, "Failed to add video");
       });
 
     // deleteVideo
