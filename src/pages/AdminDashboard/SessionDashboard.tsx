@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hook";
 import { fetchSessionById } from "@/store/session/sessionSlice";
 import VideoPlayer from "../../components/VideoPlayer";
 import CreateVideo from "./components/CreateVideo";
+import Navigation from "@/components/Navigation";
 
 const SessionDashboard = () => {
   const sessionId = useParams().sessionId;
@@ -25,6 +26,7 @@ const SessionDashboard = () => {
   if (status === "succeeded" && !session) return <div>Session not found</div>;
   return (
     <div className="min-h-screen bg-gray-100">
+      <Navigation/>
       <div className=" max-w-7xl mx-auto p-6">
         <div
           onClick={() => navigate(-1)}

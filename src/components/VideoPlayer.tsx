@@ -16,6 +16,7 @@ export default function VideoPlayer({ url }: VideoPlayerProps) {
 
   useEffect(() => {
     const video = videoRef.current;
+    console.log("video : ", video);
     if (!video) return;
 
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
@@ -114,11 +115,7 @@ export default function VideoPlayer({ url }: VideoPlayerProps) {
                 onClick={togglePlay}
                 className="hover:bg-white/20 p-2 rounded transition"
               >
-                {isPlaying ? (
-                  <Pause className=""/>
-                ) : (
-                  <Play/>
-                )}
+                {isPlaying ? <Pause className="" /> : <Play />}
               </button>
 
               <span className="text-sm">
@@ -128,7 +125,7 @@ export default function VideoPlayer({ url }: VideoPlayerProps) {
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-               <Volume2/>
+                <Volume2 />
                 <input
                   type="range"
                   min="0"
@@ -149,7 +146,7 @@ export default function VideoPlayer({ url }: VideoPlayerProps) {
                 onClick={toggleFullscreen}
                 className="hover:bg-white/20 p-2 rounded transition"
               >
-               <Maximize2/>
+                <Maximize2 />
               </button>
             </div>
           </div>

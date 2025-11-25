@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchSessions } from "../../store/session/sessionSlice";
 import { useAppDispatch, useAppSelector } from "../../store/hook";
 import CreateSession from "./components/CreateSession";
+import Navigation from "@/components/Navigation";
 
 export default function Dashboard() {
   const { user } = useAppSelector((state) => state.auth);
@@ -28,8 +29,10 @@ export default function Dashboard() {
       </div>
     );
   }
+  if (status === "loading") return <p className="justify-center h-screen w-screen flex items-center text-6xl text-gray-500">Loading...</p>;
   return (
     <div className="min-h-screen bg-gray-100">
+      <Navigation/>
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800">Sessions</h2>
@@ -43,15 +46,12 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="grid gap-6">
-          {status === "loading" && (
-            <p className="text-center text-gray-500">Loading...</p>
-          )}
+        <div className="grid grid-cols-3 gap-6">
           {sessions.length > 0 &&
             sessions.map((session) => (
               <div
                 key={session.id}
-                className="bg-white rounded-lg flex flex-col justify-between shadow-md p-6 max-w-sm min-h-64"
+                className="bg-white cursor-pointer rounded-lg flex flex-col justify-between shadow-md p-6 max-w-sm min-h-64"
                 onClick={() => navigate(`/dashboard/session/${session.id}`)}
               >
                 <div className="flex justify-between items-start mb-4">
